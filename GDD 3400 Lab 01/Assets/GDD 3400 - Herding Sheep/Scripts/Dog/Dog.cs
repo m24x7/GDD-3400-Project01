@@ -4,6 +4,10 @@ using UnityEngine;
 namespace GDD3400.Project01
 {
     [RequireComponent(typeof(Rigidbody))]
+    /// <summary>
+    /// The Dog class is the main controller for the dog character in the game.
+    /// This class acts as the brain for the dog, handling perception, decision making, and movement.
+    /// </summary>
     public class Dog : MonoBehaviour
     {
         private bool _isActive = true;
@@ -27,6 +31,10 @@ namespace GDD3400.Project01
         private string safeZoneTag = "SafeZone";
 
 
+        #region Movement Variables
+        Rigidbody rb;
+        #endregion
+
         #region Vars to Track During Runtime
         // Dog will keep track of the locations he has seen a sheep and which sheep.
         private Dictionary<GameObject, Vector3> FoundSheepLocations = new Dictionary<GameObject, Vector3>();
@@ -38,6 +46,9 @@ namespace GDD3400.Project01
             // Find the layers in the project settings
             _targetsLayer = LayerMask.GetMask("Targets");
             _obstaclesLayer = LayerMask.GetMask("Obstacles");
+
+            // Save reference to Rigidbody
+            rb = GetComponent<Rigidbody>();
 
         }
 
