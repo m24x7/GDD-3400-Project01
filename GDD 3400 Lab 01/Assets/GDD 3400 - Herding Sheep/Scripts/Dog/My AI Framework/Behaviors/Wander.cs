@@ -30,7 +30,7 @@ namespace GDD3400.Project01
             Vector3 desiredVel = new Vector3(Mathf.Sin(dogYRot), 0f, Mathf.Cos(dogYRot)) * dog.MaxSpeed;
 
             // Calculate the required acceleration to reach the desired velocity
-            Vector3 requiredAccel = (desiredVel - dog.HorizVelocity) / 0.1f;
+            Vector3 requiredAccel = (desiredVel - Vector3.ProjectOnPlane(dog.Rb.linearVelocity, Vector3.up)) / 0.1f;
 
             // Return the steering output
             return new SteeringOutput { Linear = requiredAccel, Angular = 0f };
