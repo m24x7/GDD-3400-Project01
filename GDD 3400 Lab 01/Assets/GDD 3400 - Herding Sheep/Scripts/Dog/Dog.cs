@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GDD3400.Project01
 {
+    [RequireComponent(typeof(Rigidbody))]
     public class Dog : MonoBehaviour
     {
         private bool _isActive = true;
@@ -25,6 +27,11 @@ namespace GDD3400.Project01
         private string safeZoneTag = "SafeZone";
 
 
+        #region Vars to Track During Runtime
+        // Dog will keep track of the locations he has seen a sheep and which sheep.
+        private Dictionary<GameObject, Vector3> FoundSheepLocations = new Dictionary<GameObject, Vector3>();
+        #endregion
+
 
         public void Awake()
         {
@@ -42,11 +49,17 @@ namespace GDD3400.Project01
             DecisionMaking();
         }
 
+        /// <summary>
+        /// This method handles all perception for the dog.
+        /// </summary>
         private void Perception()
         {
             
         }
 
+        /// <summary>
+        /// This method handles all decision making for the dog.
+        /// </summary>
         private void DecisionMaking()
         {
 
