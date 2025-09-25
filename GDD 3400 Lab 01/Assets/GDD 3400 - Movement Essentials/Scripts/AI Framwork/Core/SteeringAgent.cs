@@ -20,7 +20,7 @@ namespace AI.Core
         /// This is a list of MonoBehaviours, but at runtime we filter it into a different
         /// list that only includes those that implement IMovementBehavior.
         [Header("Behavior Graph")]
-        public List<MonoBehaviour> behaviorComponents = new(); // add components that implement IMovementBehavior
+        public List<MonoBehaviour> behaviorComponents = new(); // add components that implement IMovementBehavior /// new() is shorthand for "new List<MonoBehaviour>()"
 
 
         // Cached
