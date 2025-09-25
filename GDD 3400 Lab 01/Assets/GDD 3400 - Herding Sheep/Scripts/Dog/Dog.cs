@@ -48,6 +48,9 @@ namespace GDD3400.Project01
         private Rigidbody rb;
         public Rigidbody Rb => rb;
 
+        // Property returns current max speed of Dog.
+        public float MaxSpeed => _maxSpeed;
+
         // Property returns currenty Y rotation of Dog in radians.
         public float YRot => AngleUtil.YawToAngleRad(transform.rotation);
 
