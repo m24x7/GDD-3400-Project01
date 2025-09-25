@@ -32,18 +32,6 @@ namespace GDD3400.Project01
         private static string safeZoneTag = "SafeZone";
 
 
-        #region Behavior Variables (Not currently used due to change in design plan)
-        //[Header("Behavior Graph")]
-        //// Number of behaviors attached to the dog.
-        //[SerializeField] private int behaviorNum = 0;
-
-        //// List of Monobehaviors attached to the dog.
-        //[SerializeField] private List<MonoBehaviour> behaviorComponents = new();
-
-        //// List of movement behaviors that the dog can use.
-        //private readonly List<IMovementBehavior> behaviors = new();
-        #endregion
-
         // Safe Zone Position
         [SerializeField] private Vector3 safeZonePos;
 
@@ -52,29 +40,16 @@ namespace GDD3400.Project01
         private Rigidbody rb;
         public Rigidbody Rb => rb;
 
-        // Maximum speed Dog can accelerate.
-        private const float maxAcceleration = 24f;
-        public float MaxAcceleration => maxAcceleration;
-
-        // Maximum angular speed Dog can rotate.
-        private const float maxAngularSpeed = 48f;
-        public float MaxAngularSpeed => maxAngularSpeed;
-
-        // Maximum angular acceleration Dog can rotate.
-        private const float maxAngularAcceleration = 24f;
-        public float MaxAngularAcceleration => maxAngularAcceleration;
-
         // Property returns current max speed of Dog.
         public float MaxSpeed => _maxSpeed;
 
         // Property returns currenty Y rotation of Dog in radians.
         public float YRot => AngleUtil.YawToAngleRad(transform.rotation);
 
-        // Property returns current horizontal velocity of the dog.
-        public Vector3 HorizVelocity => Vector3.ProjectOnPlane(rb.linearVelocity, Vector3.up);
-
         // Target the dog is currently moving towards.
         [SerializeField] private Vector3 curTargetPos;
+
+        private float moveSpeed = _maxSpeed;
 
         // velocity to move the dog.
         [SerializeField] private Vector3 velocity;
@@ -83,23 +58,27 @@ namespace GDD3400.Project01
         [SerializeField] private Vector3 forward;
 
 
-        private const float turnRate = 5f;
+        private const float turnRate = 48f;
 
         //// Accumulator for steering outputs from behaviors.
         //private SteeringOutput accumulator;
 
         #endregion
 
-        #region Arive Behavior Variables
-        //// Radius for arriving at target.
-        //private const float targetRadius = 3.4f;
+        #region Wander Behavior Variables
+        // Max random change in Y rotation per second in degrees.
+        private float maxYRotationPerSecond = 7.5f;
+        private float wanderYRot;
 
-        //// Radius for slowing down when arriving at target.
-        //private const float slowRadius = 7.5f;
-
-        //// time to acheive max speed.
-        //private const float timeToTarget = 0.1f;
+        private Vector3 wonderVelocity = Vector3.zero;
         #endregion
+
+
+        #region Behavior Flags
+        private bool isWandering = false;
+        private bool isEscorting = false;
+        #endregion
+
 
         #region Vars to Track During Runtime
         // Dog will keep track of the locations he has seen a sheep and which sheep.
@@ -128,15 +107,6 @@ namespace GDD3400.Project01
             // Save Safe Zone Position
             // Since the Dog starts in the safe zone, we can just save his starting position as the safe zone position.
             
-
-            //// Add active movement behaviors to the behaviors list
-            //foreach (var mb in behaviorComponents)
-            //{
-            //    if (mb is IMovementBehavior b) behaviors.Add(b);
-            //}
-
-            //// Initialize the accumulator to zero
-            //accumulator = SteeringOutput.Zero;
         }
 
         private void Start()
@@ -191,6 +161,18 @@ namespace GDD3400.Project01
                     }
                 }
             }
+
+            // Remove any sheep from the dictionary that are null (despawned because they made it to the Safe Zone)
+            if (SheepFoundLocations.Count > 0)
+            {
+                var despawnedSheep = new List<GameObject>();
+                foreach (var sheep in SheepFoundLocations)
+                {
+                    if (sheep.Key == null) despawnedSheep.Add(sheep.Key);
+                }
+                foreach (var sheep in despawnedSheep) SheepFoundLocations.Remove(sheep);
+            }
+
             IsDogNearSheep();
         }
 
@@ -203,9 +185,9 @@ namespace GDD3400.Project01
             foreach (var sheep in sheepVisible)
             {
                 //Debug.Log("Checking distance to sheep");
-                if (Vector3.Distance(transform.position, sheep.transform.position) < 2.5f)
+                if (Vector3.Distance(transform.position, sheep.transform.position) < 3.5f)
                 {
-                    Debug.Log("Dog is near a sheep");
+                    //Debug.Log("Dog is near a sheep");
                     nearSheep = true;
                     break;
                 }
@@ -223,6 +205,7 @@ namespace GDD3400.Project01
 
         #endregion
 
+        #region Decision Making
         /// <summary>
         /// This method handles all decision making for the dog.
         /// </summary>
@@ -236,42 +219,56 @@ namespace GDD3400.Project01
             if (nearSheep)
             {
                 //Debug.Log("Dog is near a sheep, setting safe zone as current target position");
+                isEscorting = true;
                 curTargetPos = safeZonePos;
                 return;
             }
+            else
+            {
+                isEscorting = false;
+            }
+
+            // If no sheep are visible, look for the farthest known location of a sheep
+            if (sheepVisible.Count == 0 && SheepFoundLocations.Count > 0)
+            {
+                float farthestDist = -1f;
+                Vector3 farthestPos = Vector3.zero;
+                foreach (var location in SheepFoundLocations.Values)
+                {
+                    float testDist = Vector3.Distance(transform.position, location);
+                    if (testDist > farthestDist)
+                    {
+                        farthestDist = testDist;
+                        farthestPos = location;
+                    }
+                }
+                curTargetPos = farthestPos;
+                return;
+            }
+            // If no known locations, search the arena
+            //else Wander();
 
             // Walk to the other side of the arena
             //Debug.Log("Walking to other side of arena");
             //Debug.Log(Mathf.Sign(transform.forward.z));
             //Debug.Log(Mathf.Sign(transform.forward.x));
-            curTargetPos.x = -safeZonePos.x;
-            curTargetPos.z = -safeZonePos.z;
-
-
-
-            // If no sheep are visible, look for the farthest known location of a sheep
-            if (sheepVisible.Count == 0 && SheepFoundLocations.Count > 0)
-            {
-                Vector3 farthestDist = Vector3.zero;
-                foreach (var location in SheepFoundLocations.Values)
-                {
-                    if (Vector3.Distance(transform.position, location) > Vector3.Distance(transform.position, farthestDist))
-                    {
-                        farthestDist = location;
-                    }
-                }
-                curTargetPos = farthestDist;
-            }
-            // If no known locations, search the arena
+            if (!isEscorting) curTargetPos = new Vector3(-safeZonePos.x, 0f, -safeZonePos.z);
         }
 
-        private void WalkFoward()
+
+        private void Wander()
         {
-            // Move the dog forward at max speed
-            Vector3 forward = transform.forward * _maxSpeed;
-            Vector3 velocity = new Vector3(forward.x, 0, forward.z);
-            rb.linearVelocity = velocity;
+            // Get random Y drift to wander
+            float randYdrift = UnityEngine.Random.Range(-maxYRotationPerSecond, maxYRotationPerSecond) * Mathf.Deg2Rad * Time.deltaTime;
+            wanderYRot = AngleUtil.MapToPi(wanderYRot + randYdrift);
+
+            // Calculate Dog's Y rotatioon in radians plus the wander offset
+            float dogYRot = YRot + wanderYRot;
+
+            // Calculate the desired velocity based on the new Y rotation
+            wonderVelocity = new Vector3(Mathf.Sin(dogYRot), 0f, Mathf.Cos(dogYRot)) * MaxSpeed;
         }
+        #endregion
 
         /// <summary>
         /// Make sure to use FixedUpdate for movement with physics based Rigidbody
@@ -282,34 +279,20 @@ namespace GDD3400.Project01
             // Do nothing if the dog is not active.
             if (!_isActive) return;
 
-            //// Reset accumulator each time movement is calculated
-            //accumulator = SteeringOutput.Zero;
-
-            //// Combine steering data from each behavior
-            //foreach (var behavior in behaviors)
-            //{
-            //    var steering = behavior.GetSteering(this, curTargetPos);
-            //    if (steering.Linear != Vector3.zero && behavior.OverrideSteering)
-            //    {
-            //        // If this behavior overrides steering, set the accumulator to this behavior's steering data and skip the rest
-            //        accumulator = steering;
-            //        break;
-            //    }
-            //    // Otherwise, accumulate the steering data
-            //    accumulator.Linear += steering.Linear;
-            //    accumulator.Angular += steering.Angular;
-            //}
-
-            //// Apply the accumulated steering to the Rigidbody
-            //rb.AddForce(accumulator.Linear, ForceMode.Acceleration);
-            //rb.AddTorque(Vector3.up * accumulator.Angular, ForceMode.Acceleration);
-
+            if (isEscorting)
+            {
+                moveSpeed = 2.4f;
+            }
+            else
+            {
+                moveSpeed = _maxSpeed;
+            }
 
             // Calculate direction to the target position
             Vector3 targetDir = (curTargetPos - transform.position).normalized;
 
             // Calculate the movement vector
-            velocity = targetDir * Mathf.Min(4.5f, Vector3.Distance(transform.position, curTargetPos));
+            velocity = targetDir * Mathf.Min(moveSpeed, Vector3.Distance(transform.position, curTargetPos));
 
             // Calculate the desired rotation towards the movement vector
             if (velocity != Vector3.zero)
@@ -317,11 +300,12 @@ namespace GDD3400.Project01
                 Quaternion targetRotation = Quaternion.LookRotation(velocity);
 
                 // Smoothly rotate towards the target rotation based on the turn rate
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, turnRate);
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, turnRate * Time.fixedDeltaTime);
             }
 
             // Move the Dog
-            rb.linearVelocity = velocity;
+            if (isWandering) rb.linearVelocity = wonderVelocity;
+            else rb.linearVelocity = velocity;
 
 
             //// Clamp speed to max speed
@@ -329,34 +313,6 @@ namespace GDD3400.Project01
             //Vector3 curHorizVelocity = Vector3.ProjectOnPlane(curVelocity, Vector3.up);
             //curHorizVelocity = Vector3.ClampMagnitude(curHorizVelocity, _maxSpeed);
             //rb.linearVelocity = curHorizVelocity + Vector3.up * curVelocity.y;
-
-            //// Face the direction of movement if moving
-            //if (curHorizVelocity.sqrMagnitude > 0.0001f)
-            //{
-            //    // Calculate the desired Y rotation based on current horizontal velocity
-            //    float desiredYRot = Mathf.Atan2(curHorizVelocity.x, curHorizVelocity.z);
-
-            //    // Get the current Y rotation of the dog
-            //    float currentYRot = YRot;
-
-            //    // Calculate the Y rotation error
-            //    float YRotError = AngleUtil.MapToPi(desiredYRot - currentYRot);
-
-            //    // Calculate turn rate
-            //    float turnRate = Mathf.Min(Mathf.Abs(YRotError) / Time.fixedDeltaTime, maxAngularSpeed);
-
-            //    // Calculate the turn
-            //    float turn = Mathf.Sign(YRotError) * turnRate;
-
-            //    // Calculate the torque to apply
-            //    float torque = (turn - rb.angularVelocity.y) / Time.fixedDeltaTime;
-
-            //    // Clamp the torque to max angular acceleration
-            //    torque = Mathf.Clamp(torque, -maxAngularAcceleration, maxAngularAcceleration);
-
-            //    // Apply the torque to the Rigidbody
-            //    rb.AddTorque(Vector3.up * torque, ForceMode.Acceleration);
-            //}
         }
     }
 }
