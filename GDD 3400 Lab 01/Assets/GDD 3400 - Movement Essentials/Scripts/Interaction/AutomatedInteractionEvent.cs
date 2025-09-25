@@ -3,6 +3,10 @@ using UnityEngine.Events;
 
 namespace GDD3400.MovementEssentials
 {
+    /// <summary>
+    /// This script triggers interaction events at random intervals and positions within specified ranges.
+    /// What the event does is set in the inspector.
+    /// </summary>
     public class AutomatedInteractionEvent : MonoBehaviour
     {
         [SerializeField] private bool _isActive = true;
