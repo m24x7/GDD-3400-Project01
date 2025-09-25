@@ -33,7 +33,7 @@ namespace GDD3400.Project01
             Vector3 requiredAccel = (desiredVel - dog.HorizVelocity) / 0.1f;
 
             // Return the steering output
-            return new SteeringOutput { Linear = requiredAccel, Angular = 0f };
+            return new SteeringOutput { Linear = requiredAccel, Angular = dogYRot };
             }
     }
 }

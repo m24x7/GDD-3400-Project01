@@ -84,10 +84,13 @@ namespace GDD3400.Project01
             rb = GetComponent<Rigidbody>();
 
             // Set Rigidbody interpolation to Interpolate
-            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            //rb.interpolation = RigidbodyInterpolation.Interpolate;
 
             // Freeze XZ rotation of Rigidbody
             rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+
+            // Freeze Y position of Rigidbody
+            rb.constraints = RigidbodyConstraints.FreezePositionY;
 
             // Add active movement behaviors to the behaviors list
             foreach (var mb in behaviorComponents)
