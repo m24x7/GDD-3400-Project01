@@ -1,0 +1,34 @@
+// Behaviors/Face.cs (turn to face a world position)
+using UnityEngine;
+using AI.Core;
+
+public class Face : MonoBehaviour, IMovementBehavior
+{
+  [SerializeField] private bool _overrideSteering = false;
+  public bool OverrideSteering
+  {
+    get => _overrideSteering;
+    set => _overrideSteering = value;
+  }
+  public float satisfactionAngle = 1f * Mathf.Deg2Rad;
+  public float slowAngle = 45f * Mathf.Deg2Rad;
+  public float timeToTarget = 0.2f;
+
+  public SteeringOutput GetSteering(SteeringAgent agent, Transform target)
+  {
+    if (target == null) return SteeringOutput.Zero;
+    Vector3 delta = target.position - agent.transform.position; delta.y = 0f;
+    if (delta.sqrMagnitude < 1e-6f) return SteeringOutput.Zero;
+
+    float targetYaw = Mathf.Atan2(delta.x, delta.z);
+    float yawErr = AngleUtil.MapToPi(targetYaw - agent.OrientationRad);
+    float absErr = Mathf.Abs(yawErr);
+    if (absErr < satisfactionAngle) return SteeringOutput.Zero;
+
+    float targetRot = (absErr > slowAngle) ? agent.maxAngularSpeed : agent.maxAngularSpeed * (absErr / slowAngle);
+    targetRot *= Mathf.Sign(yawErr);
+
+    float angAccel = (targetRot - agent.Body.angularVelocity.y) / Mathf.Max(0.0001f, timeToTarget);
+    return new SteeringOutput { angular = angAccel, linear = Vector3.zero };
+  }
+}
