@@ -13,7 +13,7 @@ namespace GDD3400.Project01
         }
 
         // Max random change in Y rotation per second in degrees.
-        [SerializeField] private float maxYRotationPerSecond = 90f;
+        [SerializeField] private float maxYRotationPerSecond = 7.5f;
 
         // local wander Y rotation offset
         [SerializeField] private float wanderYRot;
@@ -33,7 +33,7 @@ namespace GDD3400.Project01
             Vector3 requiredAccel = (desiredVel - dog.HorizVelocity) / 0.1f;
 
             // Return the steering output
-            return new SteeringOutput { Linear = requiredAccel, Angular = dogYRot };
-            }
+            return new SteeringOutput { Linear = requiredAccel, Angular = 0f };
+        }
     }
 }

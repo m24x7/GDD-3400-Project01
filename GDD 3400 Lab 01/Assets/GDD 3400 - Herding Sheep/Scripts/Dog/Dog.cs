@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -31,22 +32,37 @@ namespace GDD3400.Project01
         private static string safeZoneTag = "SafeZone";
 
 
-        #region Behavior Variables
-        [Header("Behavior Graph")]
-        // Number of behaviors attached to the dog.
-        [SerializeField] private int behaviorNum = 0;
+        #region Behavior Variables (Not currently used due to change in design plan)
+        //[Header("Behavior Graph")]
+        //// Number of behaviors attached to the dog.
+        //[SerializeField] private int behaviorNum = 0;
 
-        // List of Monobehaviors attached to the dog.
-        [SerializeField] private List<MonoBehaviour> behaviorComponents = new();
+        //// List of Monobehaviors attached to the dog.
+        //[SerializeField] private List<MonoBehaviour> behaviorComponents = new();
 
-        // List of movement behaviors that the dog can use.
-        private readonly List<IMovementBehavior> behaviors = new();
+        //// List of movement behaviors that the dog can use.
+        //private readonly List<IMovementBehavior> behaviors = new();
         #endregion
+
+        // Safe Zone Position
+        [SerializeField] private Vector3 safeZonePos;
 
         #region Movement Variables
         // Rigidbody component of the dog.
         private Rigidbody rb;
         public Rigidbody Rb => rb;
+
+        // Maximum speed Dog can accelerate.
+        private const float maxAcceleration = 24f;
+        public float MaxAcceleration => maxAcceleration;
+
+        // Maximum angular speed Dog can rotate.
+        private const float maxAngularSpeed = 48f;
+        public float MaxAngularSpeed => maxAngularSpeed;
+
+        // Maximum angular acceleration Dog can rotate.
+        private const float maxAngularAcceleration = 24f;
+        public float MaxAngularAcceleration => maxAngularAcceleration;
 
         // Property returns current max speed of Dog.
         public float MaxSpeed => _maxSpeed;
@@ -58,11 +74,31 @@ namespace GDD3400.Project01
         public Vector3 HorizVelocity => Vector3.ProjectOnPlane(rb.linearVelocity, Vector3.up);
 
         // Target the dog is currently moving towards.
-        private Transform curTargetPos;
+        [SerializeField] private Vector3 curTargetPos;
 
-        // Accumulator for steering outputs from behaviors.
-        private SteeringOutput accumulator;
+        // velocity to move the dog.
+        [SerializeField] private Vector3 velocity;
 
+        // foward transformation
+        [SerializeField] private Vector3 forward;
+
+
+        private const float turnRate = 5f;
+
+        //// Accumulator for steering outputs from behaviors.
+        //private SteeringOutput accumulator;
+
+        #endregion
+
+        #region Arive Behavior Variables
+        //// Radius for arriving at target.
+        //private const float targetRadius = 3.4f;
+
+        //// Radius for slowing down when arriving at target.
+        //private const float slowRadius = 7.5f;
+
+        //// time to acheive max speed.
+        //private const float timeToTarget = 0.1f;
         #endregion
 
         #region Vars to Track During Runtime
@@ -71,6 +107,9 @@ namespace GDD3400.Project01
 
         // List of sheep currently visible to the dog.
         private List<GameObject> sheepVisible = new List<GameObject>();
+
+        // Is the dog currently near a sheep.
+        private bool nearSheep = false;
         #endregion
 
 
@@ -83,32 +122,40 @@ namespace GDD3400.Project01
             // Save reference to Rigidbody
             rb = GetComponent<Rigidbody>();
 
-            // Set Rigidbody interpolation to Interpolate
-            //rb.interpolation = RigidbodyInterpolation.Interpolate;
+            // Freeze XZ rotation and Y position of Rigidbody
+            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezePositionY;
 
-            // Freeze XZ rotation of Rigidbody
-            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+            // Save Safe Zone Position
+            // Since the Dog starts in the safe zone, we can just save his starting position as the safe zone position.
+            
 
-            // Freeze Y position of Rigidbody
-            rb.constraints = RigidbodyConstraints.FreezePositionY;
+            //// Add active movement behaviors to the behaviors list
+            //foreach (var mb in behaviorComponents)
+            //{
+            //    if (mb is IMovementBehavior b) behaviors.Add(b);
+            //}
 
-            // Add active movement behaviors to the behaviors list
-            foreach (var mb in behaviorComponents)
-            {
-                if (mb is IMovementBehavior b) behaviors.Add(b);
-            }
+            //// Initialize the accumulator to zero
+            //accumulator = SteeringOutput.Zero;
+        }
 
+        private void Start()
+        {
+            safeZonePos = transform.position;
+
+            
         }
 
         private void Update()
         {
+            //forward = transform.forward;
             // Do nothing if the dog is not active.
             if (!_isActive) return;
             
             Perception();
             DecisionMaking();
         }
-
+        #region Perception
         /// <summary>
         /// This method handles all perception for the dog.
         /// </summary>
@@ -122,14 +169,15 @@ namespace GDD3400.Project01
 
             foreach (var hitCollider in hitColliders)
             {
-                // Check if the collider belongs to a sheep (friendTag)
-                if (hitCollider.CompareTag(friendTag))
+                // Check if the collider belongs to a sheep
+                if (hitCollider.gameObject.GetComponent<Sheep>() != null)
                 {
-                    // Check for line of sight using Raycast
-                    //Vector3 directionToSheep = (hitCollider.transform.position - transform.position).normalized;
-                    //if (!Physics.Raycast(transform.position, directionToSheep, out RaycastHit hitInfo, _sightRadius, _obstaclesLayer))
-                    //{
-                        // If no obstacles are hit, the sheep is visible
+                    if (hitCollider.gameObject.GetComponent<Sheep>().InSafeZone && SheepFoundLocations.ContainsKey(hitCollider.gameObject))
+                    {
+                        SheepFoundLocations.Remove(hitCollider.gameObject);
+                    }
+                    else
+                    {
                         sheepVisible.Add(hitCollider.gameObject);
                         // Update the last known location of the sheep
                         if (SheepFoundLocations.ContainsKey(hitCollider.gameObject))
@@ -140,17 +188,89 @@ namespace GDD3400.Project01
                         {
                             SheepFoundLocations.Add(hitCollider.gameObject, hitCollider.transform.position);
                         }
-                    //}
+                    }
                 }
             }
+            IsDogNearSheep();
         }
+
+        /// <summary>
+        /// Check if the dog is near a sheep.
+        /// </summary>
+        private void IsDogNearSheep()
+        {
+            // Check if Dog is near a sheep
+            foreach (var sheep in sheepVisible)
+            {
+                //Debug.Log("Checking distance to sheep");
+                if (Vector3.Distance(transform.position, sheep.transform.position) < 2.5f)
+                {
+                    Debug.Log("Dog is near a sheep");
+                    nearSheep = true;
+                    break;
+                }
+                else
+                {
+                    //Debug.Log("Dog is not near a sheep");
+                    nearSheep = false;
+                }
+            }
+            if (sheepVisible.Count == 0)
+            {
+                nearSheep = false;
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// This method handles all decision making for the dog.
         /// </summary>
         private void DecisionMaking()
         {
-            
+            //Debug.Log("Starting DecisionMaking");
+
+            //Debug.Log("nearSheep: " + nearSheep);
+
+            // If Dog is near a sheep, walk to the safe zone
+            if (nearSheep)
+            {
+                //Debug.Log("Dog is near a sheep, setting safe zone as current target position");
+                curTargetPos = safeZonePos;
+                return;
+            }
+
+            // Walk to the other side of the arena
+            //Debug.Log("Walking to other side of arena");
+            //Debug.Log(Mathf.Sign(transform.forward.z));
+            //Debug.Log(Mathf.Sign(transform.forward.x));
+            curTargetPos.x = -safeZonePos.x;
+            curTargetPos.z = -safeZonePos.z;
+
+
+
+            // If no sheep are visible, look for the farthest known location of a sheep
+            if (sheepVisible.Count == 0 && SheepFoundLocations.Count > 0)
+            {
+                Vector3 farthestDist = Vector3.zero;
+                foreach (var location in SheepFoundLocations.Values)
+                {
+                    if (Vector3.Distance(transform.position, location) > Vector3.Distance(transform.position, farthestDist))
+                    {
+                        farthestDist = location;
+                    }
+                }
+                curTargetPos = farthestDist;
+            }
+            // If no known locations, search the arena
+        }
+
+        private void WalkFoward()
+        {
+            // Move the dog forward at max speed
+            Vector3 forward = transform.forward * _maxSpeed;
+            Vector3 velocity = new Vector3(forward.x, 0, forward.z);
+            rb.linearVelocity = velocity;
         }
 
         /// <summary>
@@ -162,33 +282,81 @@ namespace GDD3400.Project01
             // Do nothing if the dog is not active.
             if (!_isActive) return;
 
-            // Reset accumulator each time movement is calculated
-            accumulator = SteeringOutput.Zero;
+            //// Reset accumulator each time movement is calculated
+            //accumulator = SteeringOutput.Zero;
 
-            // Combine steering data from each behavior
-            foreach (var behavior in behaviors)
+            //// Combine steering data from each behavior
+            //foreach (var behavior in behaviors)
+            //{
+            //    var steering = behavior.GetSteering(this, curTargetPos);
+            //    if (steering.Linear != Vector3.zero && behavior.OverrideSteering)
+            //    {
+            //        // If this behavior overrides steering, set the accumulator to this behavior's steering data and skip the rest
+            //        accumulator = steering;
+            //        break;
+            //    }
+            //    // Otherwise, accumulate the steering data
+            //    accumulator.Linear += steering.Linear;
+            //    accumulator.Angular += steering.Angular;
+            //}
+
+            //// Apply the accumulated steering to the Rigidbody
+            //rb.AddForce(accumulator.Linear, ForceMode.Acceleration);
+            //rb.AddTorque(Vector3.up * accumulator.Angular, ForceMode.Acceleration);
+
+
+            // Calculate direction to the target position
+            Vector3 targetDir = (curTargetPos - transform.position).normalized;
+
+            // Calculate the movement vector
+            velocity = targetDir * Mathf.Min(4.5f, Vector3.Distance(transform.position, curTargetPos));
+
+            // Calculate the desired rotation towards the movement vector
+            if (velocity != Vector3.zero)
             {
-                var steering = behavior.GetSteering(this, curTargetPos);
-                if (steering.Linear != Vector3.zero && behavior.OverrideSteering)
-                {
-                    // If this behavior overrides steering, set the accumulator to this behavior's steering data and skip the rest
-                    accumulator = steering;
-                    break;
-                }
-                // Otherwise, accumulate the steering data
-                accumulator.Linear += steering.Linear;
-                accumulator.Angular += steering.Angular;
+                Quaternion targetRotation = Quaternion.LookRotation(velocity);
+
+                // Smoothly rotate towards the target rotation based on the turn rate
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, turnRate);
             }
 
-            // Apply the accumulated steering to the Rigidbody
-            rb.AddForce(accumulator.Linear, ForceMode.Acceleration);
-            rb.AddTorque(Vector3.up * accumulator.Angular, ForceMode.Acceleration);
+            // Move the Dog
+            rb.linearVelocity = velocity;
 
-            // Clamp speed to max speed
-            Vector3 curVelocity = rb.linearVelocity;
-            Vector3 curHorizVelocity = Vector3.ProjectOnPlane(curVelocity, Vector3.up);
-            curHorizVelocity = Vector3.ClampMagnitude(curHorizVelocity, _maxSpeed);
-            rb.linearVelocity = curHorizVelocity + Vector3.up * curVelocity.y;
+
+            //// Clamp speed to max speed
+            //Vector3 curVelocity = rb.linearVelocity;
+            //Vector3 curHorizVelocity = Vector3.ProjectOnPlane(curVelocity, Vector3.up);
+            //curHorizVelocity = Vector3.ClampMagnitude(curHorizVelocity, _maxSpeed);
+            //rb.linearVelocity = curHorizVelocity + Vector3.up * curVelocity.y;
+
+            //// Face the direction of movement if moving
+            //if (curHorizVelocity.sqrMagnitude > 0.0001f)
+            //{
+            //    // Calculate the desired Y rotation based on current horizontal velocity
+            //    float desiredYRot = Mathf.Atan2(curHorizVelocity.x, curHorizVelocity.z);
+
+            //    // Get the current Y rotation of the dog
+            //    float currentYRot = YRot;
+
+            //    // Calculate the Y rotation error
+            //    float YRotError = AngleUtil.MapToPi(desiredYRot - currentYRot);
+
+            //    // Calculate turn rate
+            //    float turnRate = Mathf.Min(Mathf.Abs(YRotError) / Time.fixedDeltaTime, maxAngularSpeed);
+
+            //    // Calculate the turn
+            //    float turn = Mathf.Sign(YRotError) * turnRate;
+
+            //    // Calculate the torque to apply
+            //    float torque = (turn - rb.angularVelocity.y) / Time.fixedDeltaTime;
+
+            //    // Clamp the torque to max angular acceleration
+            //    torque = Mathf.Clamp(torque, -maxAngularAcceleration, maxAngularAcceleration);
+
+            //    // Apply the torque to the Rigidbody
+            //    rb.AddTorque(Vector3.up * torque, ForceMode.Acceleration);
+            //}
         }
     }
 }
