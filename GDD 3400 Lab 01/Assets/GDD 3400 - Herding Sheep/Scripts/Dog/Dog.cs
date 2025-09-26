@@ -479,7 +479,7 @@ namespace GDD3400.Project01
             //Vector3 B = targetPoints[NextPathTargetIndex()];
             //A.y = B.y = transform.position.y;
 
-            //// === Project current position to segment param u in [0,1]
+            //// Project current position to segment param u in [0,1]
             //Vector3 AB = B - A; AB.y = 0f;
             //float ab2 = AB.sqrMagnitude;
             //if (ab2 < 1e-6f) { curTargetPointIndex = NextPathTargetIndex(); return; }
@@ -487,15 +487,15 @@ namespace GDD3400.Project01
             //Vector3 AP = new Vector3(transform.position.x - A.x, 0f, transform.position.z - A.z);
             //float u = Mathf.Clamp01(Vector3.Dot(AP, AB) / ab2);
 
-            //// === If we are essentially at B, advance segment and bail (next frame rebuilds)
+            //// If we are essentially at B, advance segment and bail (next frame rebuilds)
             //if (u >= 0.995f) { curTargetPointIndex = NextPathTargetIndex(); return; }
 
-            //// === Look-ahead target strictly inside A->B
+            //// Look-ahead target strictly inside A->B
             //float len = Mathf.Sqrt(ab2);
-            //float lead = Mathf.Max(0.5f, targetPointsSpacing * 0.25f);   // ~25% of spacing works well
+            //float lead = Mathf.Max(0.5f, targetPointsSpacing * 0.25f); // ~25% of spacing works well
             //float leadU = Mathf.Clamp01(lead / Mathf.Max(len, 0.01f));
 
-            //float uTarget = Mathf.Min(0.995f, u + leadU);         // never aim exactly at B
+            //float uTarget = Mathf.Min(0.995f, u + leadU); // never aim exactly at B
             //Vector3 target = A + AB * uTarget;
             //target.y = transform.position.y;
 
@@ -535,7 +535,7 @@ namespace GDD3400.Project01
 
             //    // Lead target STRICTLY inside the segment
             //    float len = Mathf.Sqrt(ab2);
-            //    float spacing = Mathf.Max(1f, targetPointsSpacing);                 // your grid spacing
+            //    float spacing = Mathf.Max(1f, targetPointsSpacing);
             //    float lead = Mathf.Clamp(spacing * 0.25f, 0.5f, spacing * 0.9f); // ~25% of spacing
             //    float leadU = Mathf.Clamp01(lead / Mathf.Max(len, 0.01f));
 
@@ -588,10 +588,6 @@ namespace GDD3400.Project01
             //    if (u >= EDGE) { curTargetPointIndex = NextPathTargetIndex(); continue; }
 
             //    // Compute a lead distance, adapt by speed so it doesn't collapse
-            //    Vector3 vPlanar = Vector3.ProjectOnPlane(rb.linearVelocity, Vector3.up);
-            //    float speed = vPlanar.magnitude;
-            //    float len = Mathf.Sqrt(ab2);
-
             //    // at least 25% of spacing, or what you'd cover in lookAheadSecs; pick the larger
             //    float spacing = Mathf.Max(1f, targetPointsSpacing);
             //    float leadDist = Mathf.Max(spacing * 0.25f, speed * lookAheadSecs);
@@ -633,7 +629,7 @@ namespace GDD3400.Project01
 
             const float EPS = 1e-6f;  // tiny length guard
             const float MIN_AHEAD = 0.02f;  // 2%: minimum param advance so target is always ahead
-            const float EDGE = 1f - MIN_AHEAD; // advance when we're within last 2% of segment
+            const float EDGE = 1f - MIN_AHEAD; // advance when the Dog is within last 2% of segment
 
             // Resolve onto a valid segment right now (handles overshoot & tiny segments)
             for (int guard = 0; guard < targetPoints.Count; guard++)
