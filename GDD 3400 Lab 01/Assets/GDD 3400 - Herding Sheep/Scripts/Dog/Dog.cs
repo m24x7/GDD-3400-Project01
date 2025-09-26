@@ -78,12 +78,9 @@ namespace GDD3400.Project01
         private Vector3 arenaTopLeft;
         private Vector3 arenaBottomRight;
         private float targetPointsSpacing;
-        [SerializeField] private float targetPointTolerance = 2.5f;
         [SerializeField] private List<Vector3> targetPoints = new List<Vector3>();
         [SerializeField] private int curTargetPointIndex = 0;
         [SerializeField] private bool targetPointsInitialized = false;
-        [SerializeField] private float passRadius = 1f;
-        [SerializeField] private float slowRadius = 3f;
         [SerializeField] private float lookAheadSecs = 0.5f;
         #endregion
 
@@ -96,10 +93,7 @@ namespace GDD3400.Project01
 
 
         #region Behavior Flags
-        private bool isWandering = false;
         private bool isEscorting = false;
-
-        private bool wallInfrontOfDog = false;
         #endregion
 
 
@@ -167,9 +161,12 @@ namespace GDD3400.Project01
                 // Check if the collider belongs to a sheep
                 if (hitCollider.gameObject.GetComponent<Sheep>() != null)
                 {
-                    if (hitCollider.gameObject.GetComponent<Sheep>().InSafeZone && SheepFoundLocations.ContainsKey(hitCollider.gameObject))
+                    GameObject sheep = hitCollider.gameObject;
+
+                    if (sheep.GetComponent<Sheep>().InSafeZone || Vector3.Distance(sheep.transform.position, safeZonePos) <= 7.425f)
                     {
-                        SheepFoundLocations.Remove(hitCollider.gameObject);
+                        if (SheepFoundLocations.ContainsKey(hitCollider.gameObject)) SheepFoundLocations.Remove(hitCollider.gameObject);
+                        sheepVisible.Remove(hitCollider.gameObject); // The sheeps are guaranteed to be in the Visible list if they are in the Safe Zone, so we need to remove them.
                     }
                     else
                     {
@@ -187,6 +184,17 @@ namespace GDD3400.Project01
                 }
             }
 
+            //// Remove visible sheep from the directory when the dog is within 7 meters of the safe zone
+            //if (Vector3.Distance(transform.position, safeZonePos) <= 7.45f)
+            //{
+            //    var safeSheep = new List<GameObject>();
+            //    foreach (var sheep in sheepVisible)
+            //    {
+            //        SheepFoundLocations.Remove(sheep);
+            //    }
+            //    sheepVisible.Clear();
+            //}
+
             // Remove any sheep from the dictionary that are null (despawned because they made it to the Safe Zone)
             if (SheepFoundLocations.Count > 0)
             {
@@ -199,17 +207,6 @@ namespace GDD3400.Project01
             }
 
             IsDogNearSheep();
-
-            Collider[] colliders = Physics.OverlapSphere(transform.position, 2f, _obstaclesLayer);
-
-            if (colliders.Length > 0)
-            {
-                wallInfrontOfDog = true;
-            }
-            else
-            {
-                wallInfrontOfDog = false;
-            }
         }
 
         /// <summary>
@@ -221,7 +218,7 @@ namespace GDD3400.Project01
             foreach (var sheep in sheepVisible)
             {
                 //Debug.Log("Checking distance to sheep");
-                if (Vector3.Distance(transform.position, sheep.transform.position) < 3.4f)
+                if (Vector3.Distance(transform.position, sheep.transform.position) < 3.5f)
                 {
                     //Debug.Log("Dog is near a sheep");
                     nearSheep = true;
@@ -294,6 +291,7 @@ namespace GDD3400.Project01
             }
 
             curTargetPointIndex = NearestPathTargetIndex(transform.position);
+            targetPoints.Add(safeZonePos); // Add the safe zone as the last target point in the path.
             targetPointsInitialized = true;
         }
 
@@ -332,7 +330,7 @@ namespace GDD3400.Project01
             //Debug.Log("nearSheep: " + nearSheep);
 
             // If Dog is near a sheep, walk to the safe zone
-            if (nearSheep && Vector3.Distance(transform.position, safeZonePos) > 7f && sheepVisible.Count >= 2)
+            if (nearSheep && sheepVisible.Count >= 2)
             {
                 //Debug.Log("Dog is near a sheep, setting safe zone as current target position");
                 isEscorting = true;
@@ -361,8 +359,7 @@ namespace GDD3400.Project01
                 curTargetPos = farthestPos;
                 return;
             }
-
-
+            
             PathTargetUpdate();
 
             // If no known locations, search the arena
@@ -665,7 +662,7 @@ namespace GDD3400.Project01
                 curTargetPos = target;
 
                 // debug to verify ahead-ness:
-                Debug.Log($"[Grid] idx={curTargetPointIndex} u={u:0.000} uTarget={uTarget:0.000} pos={transform.position} target={curTargetPos}");
+                //Debug.Log($"[Grid] idx={curTargetPointIndex} u={u:0.000} uTarget={uTarget:0.000} pos={transform.position} target={curTargetPos}");
 
                 return; // success this frame
             }
@@ -710,7 +707,7 @@ namespace GDD3400.Project01
 
             if (isEscorting)
             {
-                moveSpeed = 2.4f;
+                moveSpeed = 2.5f;
             }
             else
             {
@@ -782,6 +779,7 @@ namespace GDD3400.Project01
             }
 
 
+            #region Debug from Pathfinding Attempts...
             //if (Time.frameCount % 50 == 0 && targetPointsInitialized && targetPoints.Count >= 2)
             //{
             //    int nextIdx = (curTargetPointIndex + 1) % targetPoints.Count;
@@ -805,6 +803,7 @@ namespace GDD3400.Project01
 
             //    Debug.Log($"[Grid] idx={curTargetPointIndex} u={u:0.000} distToB={distToB:0.00} pos={transform.position} target={curTargetPos} v={vvPlanar:0.00}");
             //}
+            #endregion
 
         }
     }
