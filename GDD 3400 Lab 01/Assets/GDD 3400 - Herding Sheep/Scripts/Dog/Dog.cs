@@ -329,7 +329,7 @@ namespace GDD3400.Project01
 
             //Debug.Log("nearSheep: " + nearSheep);
 
-            // If Dog is near a sheep, walk to the safe zone
+            // If Dog is near 2 or more sheeps, walk to the safe zone
             if (nearSheep && sheepVisible.Count >= 2)
             {
                 //Debug.Log("Dog is near a sheep, setting safe zone as current target position");
@@ -362,6 +362,7 @@ namespace GDD3400.Project01
             
             PathTargetUpdate();
 
+            #region Old Wander Behavior
             // If no known locations, search the arena
             //if (SheepFoundLocations.Count == 0) Wander();
             //else isWandering = false;
@@ -373,9 +374,13 @@ namespace GDD3400.Project01
             //if (!isEscorting) curTargetPos = new Vector3(-safeZonePos.x, 0f, -safeZonePos.z);
 
             //if (wallInfrontOfDog) curTargetPos = -curTargetPos;
+            #endregion
         }
 
-
+        /// <summary>
+        /// This method implements a wander behavior for the dog.
+        /// This code did not get used and is not fully functional.
+        /// </summary>
         private void Wander()
         {
             //if (!isWandering) isWandering = true;
@@ -620,7 +625,10 @@ namespace GDD3400.Project01
              * ... I spent way too long on this.
              */
 
+            // If there is no path, build it
             if (!targetPointsInitialized) PathBuilder();
+
+            // If there are less than 2 target points, do nothing (because we need at least 2 points to make a segment)
             if (targetPoints.Count < 2) return;
 
             const float EPS = 1e-6f;  // tiny length guard
@@ -630,12 +638,16 @@ namespace GDD3400.Project01
             // Resolve onto a valid segment right now (handles overshoot & tiny segments)
             for (int guard = 0; guard < targetPoints.Count; guard++)
             {
+                // Get current segment endpoints
                 Vector3 A = targetPoints[curTargetPointIndex];
                 Vector3 B = targetPoints[NextPathTargetIndex()];
                 A.y = B.y = transform.position.y;
 
+                // Compute segment vector & length2
                 Vector3 AB = B - A; AB.y = 0f;
                 float ab2 = AB.sqrMagnitude;
+
+                // If length2 is too small, skip to next segment
                 if (ab2 < EPS) { curTargetPointIndex = NextPathTargetIndex(); continue; }
 
                 // Param along A->B for current position
@@ -645,9 +657,9 @@ namespace GDD3400.Project01
                 // If we're near the end already, advance immediately and re-evaluate
                 if (u >= EDGE) { curTargetPointIndex = NextPathTargetIndex(); continue; }
 
-                // Lead distance (speed-aware): at least 25% of spacing or what you'd travel in lookAheadSecs
+                // Lead distance: at least 25% of spacing or what the Dog travels in lookAheadSecs
                 float len = Mathf.Sqrt(ab2);
-                float spacing = Mathf.Max(1f, targetPointsSpacing); // or your gridSpacing field if you added one
+                float spacing = Mathf.Max(1f, targetPointsSpacing);
                 float speed = Vector3.ProjectOnPlane(rb.linearVelocity, Vector3.up).magnitude;
                 float leadDist = Mathf.Max(spacing * 0.25f, speed * lookAheadSecs);
                 float leadU = Mathf.Clamp01(leadDist / Mathf.Max(len, 0.01f));
@@ -657,6 +669,7 @@ namespace GDD3400.Project01
                 if (uTarget > EDGE) uTarget = EDGE;                 // keep inside
                 if (uTarget <= u) uTarget = Mathf.Min(EDGE, u + MIN_AHEAD); // never behind
 
+                // Set the target position
                 Vector3 target = A + AB * uTarget;
                 target.y = transform.position.y;
                 curTargetPos = target;
@@ -705,6 +718,7 @@ namespace GDD3400.Project01
             // Do nothing if the dog is not active.
             if (!_isActive) return;
 
+            // Set move speed based on behavior
             if (isEscorting)
             {
                 moveSpeed = 2.5f;
@@ -719,10 +733,12 @@ namespace GDD3400.Project01
             float dist = to.magnitude;
             Vector3 dir = dist > 1e-6f ? to / Mathf.Max(dist, 1e-6f) : Vector3.zero;
 
+            #region Easing (not used)
             // Ease in and out of turns
             //float t = Mathf.Clamp01(dist / slowRadius);
             //float eased = t * t * (3f - 2f * t); // Smoothstep easing
             //float targetSpeed = eased * moveSpeed;
+            #endregion
 
             // Calculate the target velocity
             Vector3 targetVelocity = dir * moveSpeed;
@@ -730,9 +746,11 @@ namespace GDD3400.Project01
 
             // Calculate the steering force needed to reach the target velocity
             Vector3 steering = (targetVelocity - planarVelocity) / Time.fixedDeltaTime;
+
+            // Apply the steering force to the Rigidbody
             rb.AddForce(steering, ForceMode.Acceleration);
 
-            // Calculate the desired rotation towards the movement vector
+            // If the Dog is moving, rotate to face the direction of movement
             if (targetVelocity.sqrMagnitude > 1e-6f)
             {
                 //Quaternion targetRotation = Quaternion.LookRotation(rb.linearVelocity);
@@ -744,10 +762,12 @@ namespace GDD3400.Project01
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, look, turnRate * Time.fixedDeltaTime);
             }
 
+            #region Old Movement Code
             // Move the Dog
             //if (isWandering) rb.linearVelocity = wonderVelocity;
             //else
             //rb.linearVelocity = velocity;
+            #endregion
 
 
             // Clamp speed to max speed
@@ -757,6 +777,7 @@ namespace GDD3400.Project01
             rb.linearVelocity = curHorizVelocity; //+ Vector3.up * curVelocity.y;
 
 
+            // Anti-stall logic, applies a small nudge force if the dog is stuck
             Vector3 vPlanar = Vector3.ProjectOnPlane(rb.linearVelocity, Vector3.up);
             if (vPlanar.magnitude < stuckSpeedThreshold)
             {
